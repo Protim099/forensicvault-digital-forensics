@@ -1,0 +1,7 @@
+.env
+node_modules/
+.next/
+__pycache__/
+db.sqlite3
+backend/media_private/*
+!backend/media_private/.gitkeep
