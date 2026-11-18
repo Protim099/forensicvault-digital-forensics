@@ -1,24 +1,23 @@
 "use client";
-import { useCallback, useEffect, useState } from "react";
-import { api, download, post } from "@/lib/api";
-import { Badge, Empty, Loading, useToast } from "@/components/ui";
+import { useState } from "react";
+import { ShieldCheck } from "lucide-react";
+import { api, tokens } from "@/lib/api";
 
-export default function Reports() {
-  const toast = useToast(); const [rows, setRows] = useState<any[] | null>(null); const [cases, setCases] = useState<any[]>([]); const [me, setMe] = useState<any>({});
-  const [f, setF] = useState({ case: "", findings: "", conclusion: "" });
-  const load = useCallback(() => api("/reports/").then((d) => setRows(d.results)).catch((e) => toast(e.message, true)), []);
-  useEffect(() => { setMe(JSON.parse(localStorage.getItem("fv_user") || "{}")); api("/cases/").then((d) => setCases(d.results)); load(); }, [load]);
-  const act = async (fn: () => Promise<any>, ok: string) => { try { await fn(); toast(ok); load(); } catch (e: any) { toast(e.message, true); } };
-  return <div className="space-y-3">
-    {me.role === "investigator" && <form className="card grid gap-2 md:grid-cols-4" onSubmit={(e) => { e.preventDefault(); act(() => post("/reports/", f), "Report generated"); }}>
-      <select className="input" required value={f.case} onChange={(e) => setF({ ...f, case: e.target.value })}><option value="">Case…</option>{cases.map((c) => <option key={c.id} value={c.id}>{c.case_number}</option>)}</select>
-      <input className="input" placeholder="Findings" value={f.findings} onChange={(e) => setF({ ...f, findings: e.target.value })} />
-      <input className="input" placeholder="Conclusion" value={f.conclusion} onChange={(e) => setF({ ...f, conclusion: e.target.value })} /><button className="btn">Generate PDF</button></form>}
-    <div className="card">{!rows ? <Loading /> : !rows.length ? <Empty text="No reports yet" /> :
-      <table className="w-full"><thead><tr><th>Case</th><th>Version</th><th>Status</th><th>By</th><th>Created</th><th /></tr></thead><tbody>
-        {rows.map((r) => <tr key={r.id}><td>{r.case_number}</td><td>v{r.version}</td><td><Badge v={r.status} /></td><td>{r.generated_by_name}</td><td>{new Date(r.created_at).toLocaleString()}</td>
-          <td className="space-x-1"><button className="btn-ghost" onClick={() => download(`/reports/${r.id}/download/`, `${r.case_number}-v${r.version}.pdf`).catch((e) => toast(e.message, true))}>Download</button>
-            {me.role === "reviewer" && r.status === "pending" && <><button className="btn-ghost" onClick={() => act(() => post(`/reports/${r.id}/review/`, { decision: "approved" }), "Approved")}>Approve</button>
-              <button className="btn-ghost" onClick={() => act(() => post(`/reports/${r.id}/review/`, { decision: "rejected" }), "Rejected")}>Reject</button></>}</td></tr>)}</tbody></table>}</div>
-  </div>;
+export default function Login() {
+  const [u, setU] = useState(""); const [p, setP] = useState(""); const [err, setErr] = useState(""); const [busy, setBusy] = useState(false);
+  async function submit(e: React.FormEvent) {
+    e.preventDefault(); setBusy(true); setErr("");
+    try {
+      const d = await api("/auth/login/", { method: "POST", body: JSON.stringify({ username: u, password: p }) });
+      tokens.set(d.access, d.refresh); localStorage.setItem("fv_user", JSON.stringify(d.user)); window.location.href = "/dashboard";
+    } catch { setErr("Invalid credentials or too many attempts."); } finally { setBusy(false); }
+  }
+  return <main className="flex min-h-screen items-center justify-center p-4">
+    <form onSubmit={submit} className="card w-full max-w-sm space-y-3">
+      <div className="flex items-center gap-2 text-xl font-semibold"><ShieldCheck className="text-blue-500" /> ForensicVault</div>
+      <input className="input" placeholder="Username" value={u} onChange={(e) => setU(e.target.value)} required />
+      <input className="input" type="password" placeholder="Password" value={p} onChange={(e) => setP(e.target.value)} required />
+      {err && <p className="text-sm text-red-400">{err}</p>}
+      <button className="btn w-full" disabled={busy}>{busy ? "Signing in…" : "Sign in"}</button>
+    </form></main>;
 }
